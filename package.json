@@ -1,0 +1,17 @@
+{
+  "name": "game",
+  "version": "1.0.0",
+  "description": "Me trying game programming, will probably fail!",
+  "main": "./src/main.tsx",
+  "scripts": {
+    "build": "npx tsc",
+    "serve": "npx serve .",
+    "start": "npm run build && npm run serve",
+    "watch": "npx tsc --watch"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,19 +1,20 @@
-const canvas = document.getElementById("canvas");
+const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 
-/** @type {CanvasRenderingContext2D} */
-const ctx = canvas.getContext("2d");
+let CELL_SIZE: number = 70;
+let MAP_WIDTH: number = 0,
+  MAP_HEIGHT: number = 0;
+let map: number[][];
 
-const CELL_SIZE = 100;
-let MAP_WIDTH, MAP_HEIGHT, map;
-
-function initializeMap() {
-  MAP_WIDTH = Math.floor(canvas.width / CELL_SIZE);
-  MAP_HEIGHT = Math.floor(canvas.height / CELL_SIZE);
+/**
+ * Initializes the map with cells.
+ */
+function initializeMap(): void {
+  MAP_WIDTH = Math.ceil(canvas.width / CELL_SIZE);
+  MAP_HEIGHT = Math.ceil(canvas.height / CELL_SIZE);
 
   // Reinitialize the map with new dimensions
-  map = new Array(MAP_HEIGHT)
-    .fill(null)
-    .map(() => new Array(MAP_WIDTH).fill(0));
+  map = Array.from({ length: MAP_HEIGHT }, () => new Array(MAP_WIDTH).fill(0));
 
   // Example: Set some cells to 1
   for (let i = 0; i < 7; i++) {
@@ -23,26 +24,54 @@ function initializeMap() {
   }
 }
 
-function resizeCanvas() {
+/**
+ * Resizes the canvas and reinitializes the map.
+ */
+function resizeCanvas(): void {
   canvas.width = window.innerWidth - 10;
   canvas.height = window.innerHeight - 10;
   initializeMap();
 }
 
-// Initial setup
-resizeCanvas();
-
-function drawFillRect(ctx, x, y, width, height, color) {
+/**
+ * Draws a filled rectangle.
+ */
+function drawFillRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: string,
+): void {
   ctx.fillStyle = color;
   ctx.fillRect(x, y, width, height);
 }
 
-function drawStrokeRect(ctx, x, y, width, height, color) {
+/**
+ * Draws a stroked rectangle.
+ */
+function drawStrokeRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: string,
+): void {
   ctx.strokeStyle = color;
   ctx.strokeRect(x, y, width, height);
 }
 
-function drawMap(ctx, cellSize, fillColor, strokeColor) {
+/**
+ * Draws the map grid and cells.
+ */
+function drawMap(
+  ctx: CanvasRenderingContext2D,
+  cellSize: number,
+  fillColor: string,
+  strokeColor: string,
+): void {
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
       const posX = x * cellSize;
@@ -52,8 +81,6 @@ function drawMap(ctx, cellSize, fillColor, strokeColor) {
 
       if (map[y][x] === 1) {
         drawFillRect(ctx, posX, posY, cellSize, cellSize, fillColor);
-      } else {
-        drawStrokeRect(ctx, posX, posY, cellSize, cellSize, strokeColor);
       }
     }
   }
@@ -61,40 +88,46 @@ function drawMap(ctx, cellSize, fillColor, strokeColor) {
 
 /**
  * Asynchronously loads an image.
- * @param {string} src - The source URL of the image.
- * @returns {Promise<HTMLImageElement>} A promise that resolves with the loaded image element.
  */
-function loadImage(src) {
+function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
 
     img.onload = () => resolve(img);
-    img.onerror = (err) => reject(new Error(`Failed to load image: ${src}`));
+    img.onerror = (err) => reject(new Error(`Failed to load image: ${src}. [ ERROR ]: ${err}`));
 
     img.src = src;
   });
 }
 
-let spriteAttack;
-let spriteWalk;
+let spriteAttack: HTMLImageElement;
+let spriteWalk: HTMLImageElement;
 
-async function initialize() {
+/**
+ * Initializes resources.
+ */
+async function initialize(): Promise<void> {
   spriteAttack = await loadImage("./Shinobi/Attack_1.png");
   spriteWalk = await loadImage("./Shinobi/Walk.png");
 }
 
-let frameIndex = 0;
-let frameTimer = 0;
-let animationSpeed = 0.1;
-let walkTimer = 0
-let walkSpeed = 0.1;
-let walkDirection = 1;
-let walkIndex = 0;
+let frameIndex: number = 0;
+let frameTimer: number = 0;
+let animationSpeed: number = 0.1;
 
-let lastTime = performance.now();
-const main = async () => {
+let walkTimer: number = 0;
+let walkSpeed: number = 0.1;
+let walkDirection: number = 1;
+let walkIndex: number = 0;
+
+let lastTime: number = performance.now();
+
+/**
+ * Main animation loop.
+ */
+const main = async (): Promise<void> => {
   const currentTime = performance.now();
-  const deltaTime = (currentTime - lastTime) / 1000; // Time in seconds
+  const deltaTime: number = (currentTime - lastTime) / 1000; // Time in seconds
   lastTime = currentTime;
 
   // Clear the canvas
@@ -116,7 +149,7 @@ const main = async () => {
     walkIndex = (walkIndex + 1) % 8;
   }
 
-  // Draw the current frame of the sprite
+  // Draw the current frame of the attack sprite
   ctx.drawImage(
     spriteAttack,
     (spriteAttack.width / 5) * frameIndex,
@@ -129,6 +162,7 @@ const main = async () => {
     CELL_SIZE,
   );
 
+  // Draw the current frame of the walk sprite
   ctx.drawImage(
     spriteWalk,
     (spriteWalk.width / 8) * walkIndex,
@@ -150,3 +184,6 @@ initialize().then(main);
 window.addEventListener("resize", () => {
   resizeCanvas();
 });
+
+// Initial setup
+resizeCanvas();
