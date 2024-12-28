@@ -22,6 +22,7 @@ type Frame = {
   sourceHeight: number; // Height of the frame in the sprite sheet
 };
 
+// DOUBT: Shall we implement the lock aspect ratio functionality?
 class SpriteAnimation {
   private sprite: HTMLImageElement;
   private currentFrame: number;
