@@ -22,6 +22,9 @@ export class SpriteAnimation {
   private isPlaying: boolean;
   private config: AnimationConfig;
   private frames: Frame[];
+  private flipH: boolean; // Horizontal flip flag
+  private flipV: boolean; // Vertical flip flag
+  private rotation: number; // Rotation angle in radians
 
   constructor(
     spriteSheet: HTMLImageElement,
@@ -33,14 +36,12 @@ export class SpriteAnimation {
     this.frameTimer = 0;
     this.isPlaying = config.autoplay ?? true;
     this.config = config;
-
-    // Use provided frames or generate default frames
     this.frames = initialFrames ?? this.generateFrames();
+    this.flipH = false;
+    this.flipV = false;
+    this.rotation = 0;
   }
 
-  /**
-   * Generates frames based on the animation configuration.
-   */
   private generateFrames(): Frame[] {
     const frames: Frame[] = [];
     for (let i = 0; i < this.config.frameCount; i++) {
@@ -54,9 +55,6 @@ export class SpriteAnimation {
     return frames;
   }
 
-  /**
-   * Updates the animation state based on the delta time.
-   */
   update(deltaTime: number): void {
     if (!this.isPlaying || this.frames.length === 0) return;
 
@@ -72,9 +70,6 @@ export class SpriteAnimation {
     }
   }
 
-  /**
-   * Draws the current frame of the animation to the canvas.
-   */
   draw(
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -85,59 +80,63 @@ export class SpriteAnimation {
     if (this.frames.length === 0) return;
 
     const frame = this.frames[this.currentFrame];
+    const centerX = x + destWidth / 2;
+    const centerY = y + destHeight / 2;
+
+    ctx.save(); // Save the current state
+    ctx.translate(centerX, centerY); // Translate to the sprite's center
+
+    if (this.rotation !== 0) ctx.rotate(this.rotation); // Rotate if needed
+    if (this.flipH || this.flipV) {
+      ctx.scale(this.flipH ? -1 : 1, this.flipV ? -1 : 1); // Flip horizontally or vertically
+    }
+
     ctx.drawImage(
       this.sprite,
       frame.sourceX,
       frame.sourceY,
       frame.sourceWidth,
       frame.sourceHeight,
-      x,
-      y,
+      -destWidth / 2,
+      -destHeight / 2,
       destWidth,
       destHeight,
     );
+
+    ctx.restore(); // Restore the state
   }
 
-  /**
-   * Starts or resumes the animation.
-   */
+  setFlip(horizontal: boolean, vertical: boolean): void {
+    this.flipH = horizontal;
+    this.flipV = vertical;
+  }
+
+  setRotation(angle: number): void {
+    this.rotation = angle;
+  }
+
   play(): void {
     this.isPlaying = true;
   }
 
-  /**
-   * Pauses the animation.
-   */
   pause(): void {
     this.isPlaying = false;
   }
 
-  /**
-   * Resets the animation to the first frame.
-   */
   reset(): void {
     this.currentFrame = 0;
     this.frameTimer = 0;
   }
 
-  /**
-   * Updates the entire frame array with new frames.
-   */
   setFrames(newFrames: Frame[]): void {
     this.frames = newFrames;
     this.reset();
   }
 
-  /**
-   * Adds a single frame to the animation.
-   */
   addFrame(frame: Frame): void {
     this.frames.push(frame);
   }
 
-  /**
-   * Removes a frame at a specified index.
-   */
   removeFrame(index: number): void {
     if (index >= 0 && index < this.frames.length) {
       this.frames.splice(index, 1);
@@ -147,9 +146,6 @@ export class SpriteAnimation {
     }
   }
 
-  /**
-   * Dynamically updates the animation configuration.
-   */
   updateConfig(newConfig: Partial<AnimationConfig>): void {
     this.config = { ...this.config, ...newConfig };
     if (newConfig.frameCount || newConfig.frameWidth || newConfig.frameHeight) {
@@ -157,4 +153,3 @@ export class SpriteAnimation {
     }
   }
 }
-
