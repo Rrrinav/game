@@ -1,7 +1,14 @@
 import { SpriteAnimation, AnimationConfig } from "./spriteAnimation.js";
+import { Vec2 } from "./vec2.js";
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
+
+const keys = {
+  space: false,
+  left: false,
+  right: false,
+};
 
 let CELL_SIZE: number = 70;
 let MAP_WIDTH: number = 0,
@@ -77,9 +84,15 @@ function drawMap(ctx: CanvasRenderingContext2D): void {
   }
 }
 
-
 let lastTime: number = performance.now();
+let isJumping: boolean = false;
 
+let walkX: number = 0;
+let walkY: number = CELL_SIZE * 3;
+let walkVel: number = 0;
+let jumpVel: number = 400;
+let gravity: number = 980;
+let groundY: number = CELL_SIZE * 3;
 /**
  * Main animation loop.
  */
@@ -111,26 +124,38 @@ const main = async (): Promise<void> => {
     spriteWalk,
     walkAnimationConfig,
   );
-  let walkX = 0;
-  let walkVel = 100;
 
-  walkAnimation.setFlip(walkVel < 0, false);
+
   function loop(): void {
     const currentTime = performance.now();
     const deltaTime: number = (currentTime - lastTime) / 1000; // Time in seconds
     lastTime = currentTime;
 
+    // Handle movement
+    if (!keys.left && !keys.right) {
+      walkVel = 0;
+    }
     walkX += walkVel * deltaTime;
     if (walkX > CELL_SIZE * 6 + (spriteWalk.width / (2 * 8))) {
       walkX = CELL_SIZE * 6 + (spriteWalk.width / (2 * 8));
-      walkVel *= -1;
-      walkAnimation.setFlip(true, false);
-    }
-    if (walkX <= 0) {
+      walkVel = 0;
+    } else if (walkX <= 0) {
       walkX = 0;
-      walkVel *= -1;
-      walkAnimation.setFlip(false, false);
+      walkVel = 0;
     }
+
+    // Handle jumping
+    if (isJumping) {
+      jumpVel -= gravity * deltaTime;
+      walkY -= jumpVel * deltaTime;
+
+      if (walkY >= groundY) {
+        walkY = groundY;
+        isJumping = false;
+        jumpVel = 400;
+      }
+    }
+
     attackAnimation.update(deltaTime);
     walkAnimation.update(deltaTime);
 
@@ -141,8 +166,8 @@ const main = async (): Promise<void> => {
 
     const aspectRatio = spriteWalk.width / (spriteWalk.height * 8);
     attackAnimation.draw(ctx, CELL_SIZE, CELL_SIZE * 3, CELL_SIZE, CELL_SIZE);
-    walkAnimation.draw(ctx, walkX, CELL_SIZE * 3, CELL_SIZE * aspectRatio, CELL_SIZE);
-    // Update sprite animation frame
+    walkAnimation.draw(ctx, walkX, walkY, CELL_SIZE * aspectRatio, CELL_SIZE);
+
     requestAnimationFrame(loop);
   }
   loop();
@@ -153,6 +178,50 @@ initialize().then(main);
 
 window.addEventListener("resize", () => {
   resizeCanvas();
+});
+
+window.addEventListener("keydown", (e) => {
+  switch (e.code) {
+    case "Space":
+      keys.space = true;
+      if (!isJumping) {
+        isJumping = true;
+        jumpVel = 400;
+      }
+      break;
+    case "ArrowLeft":
+    case "KeyA":
+      keys.left = true;
+      walkVel = -300;
+      break;
+    case "ArrowRight":
+    case "KeyD":
+      keys.right = true;
+      walkVel = 300;
+      break;
+  }
+});
+
+window.addEventListener("keyup", (e) => {
+  switch (e.code) {
+    case "Space":
+      keys.space = false;
+      break;
+    case "ArrowLeft":
+    case "KeyA":
+      keys.left = false;
+      if (keys.right) {
+        walkVel = 300;
+      }
+      break;
+    case "ArrowRight":
+    case "KeyD":
+      keys.right = false;
+      if (keys.left) {
+        walkVel = -300;
+      }
+      break;
+  }
 });
 
 // Initial setup
