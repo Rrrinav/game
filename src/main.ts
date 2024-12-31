@@ -1,5 +1,6 @@
 import { SpriteAnimation, AnimationConfig } from "./spriteAnimation.js";
 import { Vec2 } from "./vec2.js";
+import { Player } from "./player.js";
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
@@ -8,6 +9,7 @@ const keys = {
   space: false,
   left: false,
   right: false,
+  key_X: false,
 };
 
 let CELL_SIZE: number = 70;
@@ -30,21 +32,22 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 let spriteAttack: HTMLImageElement;
 let spriteWalk: HTMLImageElement;
 let groundSprite: HTMLImageElement;
+let spriteIdle: HTMLImageElement;
 
 async function initialize(): Promise<void> {
+  spriteIdle = await loadImage("../assets/Shinobi/Idle.png");
   spriteAttack = await loadImage("../assets/Shinobi/Attack_1.png");
-  spriteWalk = await loadImage("../assets/Shinobi/Walk-sheet.png");
+  spriteWalk = await loadImage("../assets/Shinobi/Run.png");
   groundSprite = await loadImage("../assets/Tileset.png");
+
 }
 
 function initializeMap(): void {
   MAP_WIDTH = Math.ceil(canvas.width / CELL_SIZE);
   MAP_HEIGHT = Math.ceil(canvas.height / CELL_SIZE);
 
-  // Reinitialize the map with new dimensions
   map = Array.from({ length: MAP_HEIGHT }, () => new Array(MAP_WIDTH).fill(0));
 
-  // Example: Set some cells to 1
   for (let i = 0; i < 7; i++) {
     if (i < MAP_HEIGHT && 4 < MAP_WIDTH) {
       map[4][i] = 1;
@@ -58,9 +61,6 @@ function resizeCanvas(): void {
   initializeMap();
 }
 
-/**
- * Draws the map grid and cells.
- */
 function drawMap(ctx: CanvasRenderingContext2D): void {
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
@@ -86,30 +86,30 @@ function drawMap(ctx: CanvasRenderingContext2D): void {
 
 let lastTime: number = performance.now();
 let isJumping: boolean = false;
-
-let walkX: number = 0;
-let walkY: number = CELL_SIZE * 3;
-let walkVel: number = 0;
 let jumpVel: number = 400;
 let gravity: number = 980;
-let groundY: number = CELL_SIZE * 3;
-/**
- * Main animation loop.
- */
-const main = async (): Promise<void> => {
-  const attackAnimationConfig: AnimationConfig = {
-    frameCount: 5,
-    frameWidth: spriteAttack.width / 5,
-    frameHeight: spriteAttack.height,
+let runVelocity: number = 200;
+
+// Main Game Code
+async function main(): Promise<void> {
+
+  const idleAnimationConfig: AnimationConfig = {
+    frameCount: 6,
+    frameWidth: spriteIdle.width / 6,
+    frameHeight: spriteIdle.height,
     animationCooldown: 0.1,
     loop: true,
     autoplay: true,
   };
 
-  let attackAnimation = new SpriteAnimation(
-    spriteAttack,
-    attackAnimationConfig,
-  );
+  const attackAnimationConfig: AnimationConfig = {
+    frameCount: 5,
+    frameWidth: spriteAttack.width / 5,
+    frameHeight: spriteAttack.height,
+    animationCooldown: 0.1,
+    loop: false, // Attack should not loop.
+    autoplay: true,
+  };
 
   const walkAnimationConfig: AnimationConfig = {
     frameCount: 8,
@@ -120,65 +120,47 @@ const main = async (): Promise<void> => {
     autoplay: true,
   };
 
-  let walkAnimation = new SpriteAnimation(
-    spriteWalk,
-    walkAnimationConfig,
-  );
+  // Create animations
+  const idleAnimation = new SpriteAnimation(spriteIdle, idleAnimationConfig);
+  const attackAnimation = new SpriteAnimation(spriteAttack, attackAnimationConfig);
+  const walkAnimation = new SpriteAnimation(spriteWalk, walkAnimationConfig);
 
+  let player: Player = new Player(30, CELL_SIZE * 3, idleAnimation);
 
   function loop(): void {
     const currentTime = performance.now();
-    const deltaTime: number = (currentTime - lastTime) / 1000; // Time in seconds
+    const deltaTime: number = (currentTime - lastTime) / 1000;
     lastTime = currentTime;
 
-    // Handle movement
-    if (!keys.left && !keys.right) {
-      walkVel = 0;
+    if (keys.left === true) {
+      player.x -= runVelocity * deltaTime;
+      player.setCurrentAnimation(walkAnimation);
+      player.currentAnimation?.setFlip(true, false);
     }
-    walkX += walkVel * deltaTime;
-    if (walkX > CELL_SIZE * 6 + (spriteWalk.width / (2 * 8))) {
-      walkX = CELL_SIZE * 6 + (spriteWalk.width / (2 * 8));
-      walkVel = 0;
-    } else if (walkX <= 0) {
-      walkX = 0;
-      walkVel = 0;
+    else if (keys.right === true) {
+      player.x += runVelocity * deltaTime;
+      player.setCurrentAnimation(walkAnimation);
+      player.currentAnimation?.setFlip(false, false);
+    } else {
+      player.setCurrentAnimation(idleAnimation);
     }
-
-    // Handle jumping
-    if (isJumping) {
-      jumpVel -= gravity * deltaTime;
-      walkY -= jumpVel * deltaTime;
-
-      if (walkY >= groundY) {
-        walkY = groundY;
-        isJumping = false;
-        jumpVel = 400;
-      }
-    }
-
-    attackAnimation.update(deltaTime);
-    walkAnimation.update(deltaTime);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw the map
     drawMap(ctx);
 
-    const aspectRatio = spriteWalk.width / (spriteWalk.height * 8);
-    attackAnimation.draw(ctx, CELL_SIZE, CELL_SIZE * 3, CELL_SIZE, CELL_SIZE);
-    walkAnimation.draw(ctx, walkX, walkY, CELL_SIZE * aspectRatio, CELL_SIZE);
-
+    player.currentAnimation?.update(deltaTime);
+    player.currentAnimation?.draw(ctx, player.x, player.y, CELL_SIZE, CELL_SIZE)
     requestAnimationFrame(loop);
   }
+
   loop();
-};
+}
 
-// Initialize and start the main loop
-initialize().then(main);
+initialize().then(() => {
+  main();
+})
 
-window.addEventListener("resize", () => {
-  resizeCanvas();
-});
+resizeCanvas();
 
 window.addEventListener("keydown", (e) => {
   switch (e.code) {
@@ -192,12 +174,13 @@ window.addEventListener("keydown", (e) => {
     case "ArrowLeft":
     case "KeyA":
       keys.left = true;
-      walkVel = -300;
       break;
     case "ArrowRight":
     case "KeyD":
       keys.right = true;
-      walkVel = 300;
+      break;
+    case "KeyX":
+      keys.key_X = true;
       break;
   }
 });
@@ -211,18 +194,19 @@ window.addEventListener("keyup", (e) => {
     case "KeyA":
       keys.left = false;
       if (keys.right) {
-        walkVel = 300;
+      } else {
       }
       break;
     case "ArrowRight":
     case "KeyD":
       keys.right = false;
       if (keys.left) {
-        walkVel = -300;
+      } else {
       }
+      break;
+    case "KeyX":
+      keys.key_X = false;
       break;
   }
 });
 
-// Initial setup
-resizeCanvas();

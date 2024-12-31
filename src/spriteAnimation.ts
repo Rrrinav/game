@@ -25,6 +25,7 @@ export class SpriteAnimation {
   private flipH: boolean; // Horizontal flip flag
   private flipV: boolean; // Vertical flip flag
   private rotation: number; // Rotation angle in radians
+  private isFinished: boolean;
 
   constructor(
     spriteSheet: HTMLImageElement,
@@ -40,6 +41,7 @@ export class SpriteAnimation {
     this.flipH = false;
     this.flipV = false;
     this.rotation = 0;
+    this.isFinished = false;
   }
 
   private generateFrames(): Frame[] {
@@ -64,8 +66,15 @@ export class SpriteAnimation {
       this.currentFrame++;
 
       if (this.currentFrame >= this.frames.length) {
-        this.currentFrame = this.config.loop ? 0 : this.frames.length - 1;
-        if (!this.config.loop) this.isPlaying = false;
+        if (this.config.loop) {
+          this.currentFrame = 0; // Reset to the first frame if looping
+        } else {
+          this.currentFrame = this.frames.length - 1; // Stay on the last frame
+          this.isPlaying = false; // Stop playing
+          this.isFinished = true; // Mark as finished
+        }
+      } else {
+        this.isFinished = false; // Reset isFinished if not at the end
       }
     }
   }
@@ -117,6 +126,7 @@ export class SpriteAnimation {
 
   play(): void {
     this.isPlaying = true;
+    this.isFinished = false;
   }
 
   pause(): void {
@@ -126,6 +136,7 @@ export class SpriteAnimation {
   reset(): void {
     this.currentFrame = 0;
     this.frameTimer = 0;
+    this.isFinished = false;
   }
 
   setFrames(newFrames: Frame[]): void {
@@ -135,6 +146,10 @@ export class SpriteAnimation {
 
   addFrame(frame: Frame): void {
     this.frames.push(frame);
+  }
+
+  isAnimFinished(): boolean {
+    return this.isFinished;
   }
 
   removeFrame(index: number): void {
