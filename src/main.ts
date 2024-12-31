@@ -106,7 +106,7 @@ async function main(): Promise<void> {
     frameCount: 5,
     frameWidth: spriteAttack.width / 5,
     frameHeight: spriteAttack.height,
-    animationCooldown: 0.1,
+    animationCooldown: 0.04,
     loop: true, // Attack should not loop.
     autoplay: true,
     singleUse: true
@@ -153,7 +153,7 @@ async function main(): Promise<void> {
       player.x += runVelocity * deltaTime;
       player.setCurrentAnimation(walkAnimation);
       player.currentAnimation?.setFlip(false, false);
-    } else if (keys.key_X === true) {
+    } else if (keys.key_X === true && !isAttacking) {
       isAttacking = true;
       player.setAnimationComplete(false)
       player.setCurrentAnimation(attackAnimation);
