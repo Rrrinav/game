@@ -107,8 +107,9 @@ async function main(): Promise<void> {
     frameWidth: spriteAttack.width / 5,
     frameHeight: spriteAttack.height,
     animationCooldown: 0.1,
-    loop: false, // Attack should not loop.
+    loop: true, // Attack should not loop.
     autoplay: true,
+    singleUse: true
   };
 
   const walkAnimationConfig: AnimationConfig = {
@@ -126,24 +127,41 @@ async function main(): Promise<void> {
   const walkAnimation = new SpriteAnimation(spriteWalk, walkAnimationConfig);
 
   let player: Player = new Player(30, CELL_SIZE * 3, idleAnimation);
+  let isAttacking: boolean = false;
 
   function loop(): void {
     const currentTime = performance.now();
     const deltaTime: number = (currentTime - lastTime) / 1000;
     lastTime = currentTime;
 
-    if (keys.left === true) {
+    console.log("isAttacking: ", isAttacking);
+    console.log("isFinished: ", player.currentAnimation?.isAnimFinished());
+
+    if (isAttacking && player.currentAnimation?.isAnimFinished()) {
+      console.log("Attack finished");
+      player.setAnimationComplete(true);
+      player.setCurrentAnimation(idleAnimation);
+      isAttacking = false;
+    }
+
+    if (keys.left === true && player.isCurrentAnimationComplete()) {
       player.x -= runVelocity * deltaTime;
       player.setCurrentAnimation(walkAnimation);
       player.currentAnimation?.setFlip(true, false);
     }
-    else if (keys.right === true) {
+    else if (keys.right === true && player.isCurrentAnimationComplete()) {
       player.x += runVelocity * deltaTime;
       player.setCurrentAnimation(walkAnimation);
       player.currentAnimation?.setFlip(false, false);
-    } else {
+    } else if (keys.key_X === true) {
+      isAttacking = true;
+      player.setAnimationComplete(false)
+      player.setCurrentAnimation(attackAnimation);
+      player.currentAnimation?.reset();
+    } else if (player.isCurrentAnimationComplete()) {
       player.setCurrentAnimation(idleAnimation);
     }
+
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawMap(ctx);

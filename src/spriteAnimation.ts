@@ -5,6 +5,7 @@ export type AnimationConfig = {
   animationCooldown: number; // Time (in ms) between frames
   loop?: boolean; // Should the animation loop
   autoplay?: boolean; // Should the animation start playing immediately
+  singleUse?: boolean; // Marks finished after every loop
 };
 
 export type Frame = {
@@ -26,6 +27,7 @@ export class SpriteAnimation {
   private flipV: boolean; // Vertical flip flag
   private rotation: number; // Rotation angle in radians
   private isFinished: boolean;
+  private isSingleUse: boolean;
 
   constructor(
     spriteSheet: HTMLImageElement,
@@ -42,6 +44,7 @@ export class SpriteAnimation {
     this.flipV = false;
     this.rotation = 0;
     this.isFinished = false;
+    this.isSingleUse = config.singleUse ?? false;
   }
 
   private generateFrames(): Frame[] {
@@ -68,6 +71,9 @@ export class SpriteAnimation {
       if (this.currentFrame >= this.frames.length) {
         if (this.config.loop) {
           this.currentFrame = 0; // Reset to the first frame if looping
+          if(this.isSingleUse) {
+            this.isFinished = true;
+          }
         } else {
           this.currentFrame = this.frames.length - 1; // Stay on the last frame
           this.isPlaying = false; // Stop playing
