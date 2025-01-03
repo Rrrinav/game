@@ -39,7 +39,6 @@ async function initialize(): Promise<void> {
   spriteAttack = await loadImage("../assets/Shinobi/Attack_1.png");
   spriteWalk = await loadImage("../assets/Shinobi/Run.png");
   groundSprite = await loadImage("../assets/Tileset.png");
-
 }
 
 function initializeMap(): void {
@@ -88,11 +87,10 @@ let lastTime: number = performance.now();
 let isJumping: boolean = false;
 let jumpVel: number = 400;
 let gravity: number = 980;
-let runVelocity: number = 200;
+let runVelocity: number = 150;
 
 // Main Game Code
 async function main(): Promise<void> {
-
   const idleAnimationConfig: AnimationConfig = {
     frameCount: 6,
     frameWidth: spriteIdle.width / 6,
@@ -107,7 +105,7 @@ async function main(): Promise<void> {
     frameWidth: spriteAttack.width / 5,
     frameHeight: spriteAttack.height,
     animationCooldown: 0.04,
-    loop: true, // Attack should not loop.
+    loop: true,
     autoplay: true,
     singleUse: true
   };
@@ -129,21 +127,24 @@ async function main(): Promise<void> {
   let player: Player = new Player(30, CELL_SIZE * 3, idleAnimation);
   let isAttacking: boolean = false;
 
+  function checkCollision(x: number, y: number): boolean {
+    const cellX = Math.floor(x / CELL_SIZE);
+    const cellY = Math.floor(y / CELL_SIZE);
+
+    if (cellY >= 0 && cellY < MAP_HEIGHT && cellX >= 0 && cellX < MAP_WIDTH) {
+      console.log(cellX, cellY);
+      console.log(map[cellY][cellX] === 1);
+      return map[cellY][cellX] === 1;
+    }
+    return false;
+  }
+
   function loop(): void {
     const currentTime = performance.now();
     const deltaTime: number = (currentTime - lastTime) / 1000;
     lastTime = currentTime;
 
-    console.log("isAttacking: ", isAttacking);
-    console.log("isFinished: ", player.currentAnimation?.isAnimFinished());
-
-    if (isAttacking && player.currentAnimation?.isAnimFinished()) {
-      console.log("Attack finished");
-      player.setAnimationComplete(true);
-      player.setCurrentAnimation(idleAnimation);
-      isAttacking = false;
-    }
-
+    // Handle horizontal movement
     if (keys.left === true && player.isCurrentAnimationComplete()) {
       player.x -= runVelocity * deltaTime;
       player.setCurrentAnimation(walkAnimation);
@@ -162,6 +163,30 @@ async function main(): Promise<void> {
       player.setCurrentAnimation(idleAnimation);
     }
 
+    // Handle jumping and gravity
+    if (isJumping) {
+      player.y -= jumpVel * deltaTime;
+      jumpVel -= gravity * deltaTime;
+
+      // Check for ground collision
+      if (checkCollision(player.x, player.y + CELL_SIZE)) {
+        isJumping = false;
+        // Snap to ground
+        player.y = Math.floor(player.y / CELL_SIZE) * CELL_SIZE;
+      }
+    } else {
+      // Check if we should fall
+      if (!checkCollision(player.x, player.y + CELL_SIZE)) {
+        isJumping = true;
+        jumpVel = 0;
+      }
+    }
+
+    if (isAttacking && player.currentAnimation?.isAnimFinished()) {
+      player.setAnimationComplete(true);
+      player.setCurrentAnimation(idleAnimation);
+      isAttacking = false;
+    }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawMap(ctx);
@@ -227,4 +252,3 @@ window.addEventListener("keyup", (e) => {
       break;
   }
 });
-

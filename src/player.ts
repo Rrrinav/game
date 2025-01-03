@@ -4,7 +4,8 @@ export class Player {
   public x: number;
   public y: number;
   public currentAnimation: SpriteAnimation | null;
-  public isCurrentAnimComplete: boolean = false;
+  public isCurrentAnimComplete: boolean = true; // True because none have started yet, so none existing ones have completed!
+  // DOUBT: IDK if this is right? but for first animation others must be complete for it to start!
 
   constructor(x: number = 0, y: number = 0, defAnimation: SpriteAnimation) {
     this.x = x;
