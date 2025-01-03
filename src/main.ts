@@ -34,6 +34,41 @@ let spriteWalk: HTMLImageElement;
 let groundSprite: HTMLImageElement;
 let spriteIdle: HTMLImageElement;
 
+function drawDebugInfoPLayer(ctx: CanvasRenderingContext2D, player: Player, rectColor: string = "red", arrowColor: string = "white") {
+  if (player.isDebug) {
+    ctx.strokeStyle = rectColor;
+    ctx.strokeRect(player.x, player.y, CELL_SIZE, CELL_SIZE);
+
+    // Draw direction line
+    ctx.beginPath();
+    ctx.strokeStyle = arrowColor;
+    ctx.lineWidth = 2;
+
+    const centerX = player.x + CELL_SIZE / 2;
+    const centerY = player.y + CELL_SIZE / 2;
+    const lineLength = CELL_SIZE * 0.75;
+
+    // Draw direction line based on movement
+    if (keys.left) {
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(centerX - lineLength, centerY);
+      // Add arrowhead
+      ctx.lineTo(centerX - lineLength + 10, centerY - 10);
+      ctx.moveTo(centerX - lineLength, centerY);
+      ctx.lineTo(centerX - lineLength + 10, centerY + 10);
+    } else if (keys.right) {
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(centerX + lineLength, centerY);
+      // Add arrowhead
+      ctx.lineTo(centerX + lineLength - 10, centerY - 10);
+      ctx.moveTo(centerX + lineLength, centerY);
+      ctx.lineTo(centerX + lineLength - 10, centerY + 10);
+    }
+
+    ctx.stroke();
+  }
+}
+
 async function initialize(): Promise<void> {
   spriteIdle = await loadImage("../assets/Shinobi/Idle.png");
   spriteAttack = await loadImage("../assets/Shinobi/Attack_1.png");
@@ -125,8 +160,10 @@ async function main(): Promise<void> {
   const walkAnimation = new SpriteAnimation(spriteWalk, walkAnimationConfig);
 
   let player: Player = new Player(30, CELL_SIZE * 3, idleAnimation);
+  player.isDebug = true;
   let isAttacking: boolean = false;
 
+  // BUG: Sprite sheets make hitboxes weird!
   function checkCollision(x: number, y: number): boolean {
     const cellX = Math.floor(x / CELL_SIZE);
     const cellY = Math.floor(y / CELL_SIZE);
@@ -193,6 +230,10 @@ async function main(): Promise<void> {
 
     player.currentAnimation?.update(deltaTime);
     player.currentAnimation?.draw(ctx, player.x, player.y, CELL_SIZE, CELL_SIZE)
+
+    if (player.isDebug) {
+      drawDebugInfoPLayer(ctx, player)
+    }
     requestAnimationFrame(loop);
   }
 
