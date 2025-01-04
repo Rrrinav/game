@@ -34,6 +34,7 @@ let spriteWalk: HTMLImageElement;
 let groundSprite: HTMLImageElement;
 let spriteIdle: HTMLImageElement;
 
+// INFO: Temporary feature
 function drawDebugInfoPLayer(ctx: CanvasRenderingContext2D, player: Player, rectColor: string = "red", arrowColor: string = "white") {
   if (player.isDebug) {
     ctx.strokeStyle = rectColor;
@@ -122,7 +123,7 @@ let lastTime: number = performance.now();
 let isJumping: boolean = false;
 let jumpVel: number = 400;
 let gravity: number = 980;
-let runVelocity: number = 150;
+let runVelocity: number = 180;
 
 // Main Game Code
 async function main(): Promise<void> {
@@ -149,7 +150,7 @@ async function main(): Promise<void> {
     frameCount: 8,
     frameWidth: spriteWalk.width / 8,
     frameHeight: spriteWalk.height,
-    animationCooldown: 0.1,
+    animationCooldown: 0.06,
     loop: true,
     autoplay: true,
   };
@@ -160,7 +161,7 @@ async function main(): Promise<void> {
   const walkAnimation = new SpriteAnimation(spriteWalk, walkAnimationConfig);
 
   let player: Player = new Player(30, CELL_SIZE * 3, idleAnimation);
-  player.isDebug = true;
+  player.isDebug = false;
   let isAttacking: boolean = false;
 
   // BUG: Sprite sheets make hitboxes weird!
