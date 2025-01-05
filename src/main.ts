@@ -118,6 +118,7 @@ function initializeMap(): void {
 
   map[3][11] = 1;
   map[3][8] = 1;
+  map[1][5] = 1;
 
   for (let i = 0; i < 3; i++) {
     if (i < MAP_WIDTH && 2 < MAP_HEIGHT) {
@@ -199,50 +200,72 @@ function checkCollisionSides(x: number, y: number, width: number, height: number
     snapPosition: new Vec2(x, y)
   };
 
-  // Calculate cell positions
-  const leftCell = Math.floor((x) / CELL_SIZE);
-  const rightCell = Math.floor((x + width - 1) / CELL_SIZE);
-  const topCell = Math.floor((y) / CELL_SIZE);
-  const bottomCell = Math.floor((y + height) / CELL_SIZE);
-  // Check horizontal collisions
-  for (let cy = topCell; cy <= bottomCell; cy += CELL_SIZE) {
-    //if (cy < 0 || cy >= MAP_HEIGHT) continue;
+  // Calculate the player's bounding box edges
+  const playerLeft = x;
+  const playerRight = x + width;
+  const playerTop = y;
+  const playerBottom = y + height;
 
-    // Check left side
-    if (map[cy][leftCell] === 1) {
-      result.collided = true;
-      result.sides.left = true;
-      result.snapPosition.x = (leftCell + 1) * CELL_SIZE;
-      console.log("L: ", leftCell, "CL: ", (leftCell + 1))
-    }
+  // Calculate the cells the player is overlapping
+  const leftCell = Math.floor(playerLeft / CELL_SIZE);
+  const rightCell = Math.floor((playerRight - 1) / CELL_SIZE); // Subtract 1 to avoid detecting next cell
+  const topCell = Math.floor(playerTop / CELL_SIZE);
+  const bottomCell = Math.floor((playerBottom - 1) / CELL_SIZE); // Subtract 1 to avoid detecting next cell
 
-    // Check right side
-    if (map[cy][rightCell] === 1) {
-      result.collided = true;
-      result.sides.right = true;
-      result.snapPosition.x = rightCell * CELL_SIZE - width;
-      console.log("R: ", rightCell, "CR: ", rightCell - 1)
-    }
-  }
+  // Check each potentially colliding cell
+  for (let cy = topCell; cy <= bottomCell; cy++) {
+    for (let cx = leftCell; cx <= rightCell; cx++) {
+      // Skip if out of bounds
+      if (cy < 0 || cy >= MAP_HEIGHT || cx < 0 || cx >= MAP_WIDTH) continue;
 
-  // Check vertical collisions
-  for (let cx = leftCell; cx <= rightCell; cx++) {
-    //if (cx < 0 || cx >= MAP_WIDTH) continue;
+      if (map[cy][cx] === 1) {
+        // Calculate cell edges
+        const cellLeft = cx * CELL_SIZE;
+        const cellRight = (cx + 1) * CELL_SIZE;
+        const cellTop = cy * CELL_SIZE;
+        const cellBottom = (cy + 1) * CELL_SIZE;
 
-    // Check top side
-    if (map[topCell][cx] === 1) {
-      result.collided = true;
-      result.sides.top = true;
-      result.snapPosition.y = (topCell + 1) * CELL_SIZE;
-      console.log("T: ", topCell, "CT: ", (topCell + 1))
-    }
+        // Calculate overlap amounts
+        const overlapLeft = playerRight - cellLeft;
+        const overlapRight = cellRight - playerLeft;
+        const overlapTop = playerBottom - cellTop;
+        const overlapBottom = cellBottom - playerTop;
 
-    // Check bottom side
-    if (map[bottomCell][cx] === 1) {
-      result.collided = true;
-      result.sides.bottom = true;
-      result.snapPosition.y = bottomCell * CELL_SIZE - height;
-      console.log("B: ", bottomCell, "CB: ", bottomCell - 1)
+        // Find the smallest overlap
+        const overlaps = [
+          { amount: overlapLeft, type: 'left' },
+          { amount: overlapRight, type: 'right' },
+          { amount: overlapTop, type: 'top' },
+          { amount: overlapBottom, type: 'bottom' }
+        ].filter(overlap => overlap.amount > 0);
+
+        if (overlaps.length > 0) {
+          result.collided = true;
+          const minOverlap = overlaps.reduce((min, current) =>
+            current.amount < min.amount ? current : min
+          );
+
+          // Apply resolution based on smallest overlap
+          switch (minOverlap.type) {
+            case 'left':
+              result.sides.right = true;
+              result.snapPosition.x = cellLeft - width;
+              break;
+            case 'right':
+              result.sides.left = true;
+              result.snapPosition.x = cellRight;
+              break;
+            case 'top':
+              result.sides.bottom = true;
+              result.snapPosition.y = cellTop - height;
+              break;
+            case 'bottom':
+              result.sides.top = true;
+              result.snapPosition.y = cellBottom;
+              break;
+          }
+        }
+      }
     }
   }
 
@@ -330,12 +353,7 @@ async function main(): Promise<void> {
 
     // Check collisions at new position
     const collision = checkCollisionSides(nextX, nextY, CELL_SIZE, CELL_SIZE);
-    if (collision.collided) {
-      color = "blue";
-    }
-    else {
-      color = "red";
-    }
+
     // Apply horizontal movement if no collision
     if (!collision.sides.left && !collision.sides.right) {
       player.x = nextX;
@@ -343,14 +361,24 @@ async function main(): Promise<void> {
       player.x = collision.snapPosition.x;
     }
 
-    // Apply vertical movement and handle ground collision
+    // Apply vertical movement and handle collisions with preserved momentum
     if (!collision.sides.top && !collision.sides.bottom) {
       player.y = nextY;
     } else {
       player.y = collision.snapPosition.y;
+
       if (collision.sides.bottom) {
-        isJumping = false;
-        jumpVel = 550;
+        // Only stop jumping if we're moving downward
+        if (jumpVel < 0) {
+          isJumping = false;
+          jumpVel = 550; // Reset jump velocity
+        } else {
+          // We hit something while moving upward - preserve remaining upward velocity
+          player.y = collision.snapPosition.y;
+        }
+      } else if (collision.sides.top) {
+        // Hit ceiling - reverse velocity
+        jumpVel = -jumpVel * 0.3; // Add some bounce/rebound effect (optional)
       }
     }
 
@@ -359,10 +387,11 @@ async function main(): Promise<void> {
       const groundCheck = checkCollisionSides(player.x, player.y + 1, CELL_SIZE, CELL_SIZE);
       if (!groundCheck.sides.bottom) {
         isJumping = true;
-        jumpVel = 0;
+        jumpVel = 0; // Start falling from rest
       }
     }
 
+    // Reset position if fallen off the screen
     if (player.y > window.innerHeight) {
       player.y = 0;
       player.x = 0;
