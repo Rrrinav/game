@@ -4,28 +4,13 @@ import { Vec2 } from "./vec2.js";
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
-const debug: boolean = true;
+const DEBUG: boolean = false;
 
 const keys = {
   space: false,
   left: false,
   right: false,
   key_X: false,
-};
-
-enum Sides {
-  LEFT = "__left__",
-  RIGHT = "__right__",
-  UP = "__up__",
-  DOWN = "__down__",
-}
-
-type CollisionInfo = {
-  left: boolean,
-  right: boolean,
-  top: boolean,
-  bottom: boolean,
-  outofBounds: boolean,
 };
 
 let CELL_SIZE: number = 70;
@@ -133,18 +118,26 @@ function resizeCanvas(): void {
   initializeMap();
 }
 
+function drawMapDebug(ctx: CanvasRenderingContext2D) {
+
+  for (let y = 0; y < MAP_HEIGHT; y++) {
+    for (let x = 0; x < MAP_WIDTH; x++) {
+      const posX = x * CELL_SIZE;
+      const posY = y * CELL_SIZE;
+      ctx.font = "10px Arial";
+      ctx.fillStyle = "white";
+      ctx.fillText(`${x},${y}`, posX + 5, posY + 10);
+      ctx.strokeStyle = "black";
+      ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    }
+  }
+}
+
 function drawMap(ctx: CanvasRenderingContext2D): void {
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
       const posX = x * CELL_SIZE;
       const posY = y * CELL_SIZE;
-      if (debug) {
-        ctx.font = "10px Arial";
-        ctx.fillStyle = "white";
-        ctx.fillText(`${x},${y}`, posX + 5, posY + 10);
-        ctx.strokeStyle = "black";
-        ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-      }
       if (map[y][x] === 1) {
         ctx.drawImage(
           groundSprite,
@@ -201,16 +194,16 @@ function checkCollisionSides(x: number, y: number, width: number, height: number
   };
 
   // Calculate the player's bounding box edges
-  const playerLeft = x;
-  const playerRight = x + width;
-  const playerTop = y;
-  const playerBottom = y + height;
+  const playerLeft: number = x;
+  const playerRight: number = x + width;
+  const playerTop: number = y;
+  const playerBottom: number = y + height;
 
   // Calculate the cells the player is overlapping
-  const leftCell = Math.floor(playerLeft / CELL_SIZE);
-  const rightCell = Math.floor((playerRight - 1) / CELL_SIZE); // Subtract 1 to avoid detecting next cell
-  const topCell = Math.floor(playerTop / CELL_SIZE);
-  const bottomCell = Math.floor((playerBottom - 1) / CELL_SIZE); // Subtract 1 to avoid detecting next cell
+  const leftCell: number = Math.floor(playerLeft / CELL_SIZE);
+  const rightCell: number = Math.floor((playerRight - 1) / CELL_SIZE); // Subtract 1 to avoid detecting next cell
+  const topCell: number = Math.floor(playerTop / CELL_SIZE);
+  const bottomCell: number = Math.floor((playerBottom - 1) / CELL_SIZE); // Subtract 1 to avoid detecting next cell
 
   // Check each potentially colliding cell
   for (let cy = topCell; cy <= bottomCell; cy++) {
@@ -273,11 +266,8 @@ function checkCollisionSides(x: number, y: number, width: number, height: number
 }
 
 let lastTime: number = performance.now();
-let isJumping: boolean = false;
-let jumpVel: number = 550;
-let gravity: number = 980;
-let runVelocity: number = 200;
-let color = "red"
+const GRAVITY: number = 980;
+let hitBoxColor = "blue"
 
 // Main Game Code
 async function main(): Promise<void> {
@@ -328,12 +318,12 @@ async function main(): Promise<void> {
 
     // Handle horizontal movement
     if (keys.left === true && player.isCurrentAnimationComplete()) {
-      nextX = player.x - runVelocity * deltaTime;
+      nextX = player.x - player.dx * deltaTime;
       player.setCurrentAnimation(walkAnimation);
       player.currentAnimation?.setFlip(true, false);
     }
     else if (keys.right === true && player.isCurrentAnimationComplete()) {
-      nextX = player.x + runVelocity * deltaTime;
+      nextX = player.x + player.dx * deltaTime;
       player.setCurrentAnimation(walkAnimation);
       player.currentAnimation?.setFlip(false, false);
     } else if (keys.key_X === true && !isAttacking) {
@@ -344,15 +334,22 @@ async function main(): Promise<void> {
     } else if (player.isCurrentAnimationComplete()) {
       player.setCurrentAnimation(idleAnimation);
     }
-
+    if (keys.space === true && !player.isJumping) {
+      player.isJumping = true;
+    }
     // Handle jumping and gravity
-    if (isJumping) {
-      nextY = player.y - jumpVel * deltaTime;
-      jumpVel -= gravity * deltaTime;
+    if (player.isJumping) {
+      nextY = player.y - player.dy * deltaTime;
+      player.dy -= GRAVITY * deltaTime;
     }
 
     // Check collisions at new position
     const collision = checkCollisionSides(nextX, nextY, CELL_SIZE, CELL_SIZE);
+
+    if (collision.collided)
+      hitBoxColor = "red"
+    else
+      hitBoxColor = "blue"
 
     // Apply horizontal movement if no collision
     if (!collision.sides.left && !collision.sides.right) {
@@ -369,25 +366,25 @@ async function main(): Promise<void> {
 
       if (collision.sides.bottom) {
         // Only stop jumping if we're moving downward
-        if (jumpVel < 0) {
-          isJumping = false;
-          jumpVel = 550; // Reset jump velocity
+        if (player.dy < 0) {
+          player.isJumping = false;
+          player.dy = 550; // Reset jump velocity
         } else {
           // We hit something while moving upward - preserve remaining upward velocity
           player.y = collision.snapPosition.y;
         }
       } else if (collision.sides.top) {
         // Hit ceiling - reverse velocity
-        jumpVel = -jumpVel * 0.3; // Add some bounce/rebound effect (optional)
+        player.dy = -player.dy * 0.3; // Add some bounce/rebound effect (optional)
       }
     }
 
     // Check if we should fall
-    if (!isJumping) {
+    if (!player.isJumping) {
       const groundCheck = checkCollisionSides(player.x, player.y + 1, CELL_SIZE, CELL_SIZE);
       if (!groundCheck.sides.bottom) {
-        isJumping = true;
-        jumpVel = 0; // Start falling from rest
+        player.isJumping = true;
+        player.dy = 0; // Start falling from rest
       }
     }
 
@@ -395,7 +392,7 @@ async function main(): Promise<void> {
     if (player.y > window.innerHeight) {
       player.y = 0;
       player.x = 0;
-      jumpVel = 550;
+      player.dy = 550;
     }
 
     if (isAttacking && player.currentAnimation?.isAnimFinished()) {
@@ -409,8 +406,9 @@ async function main(): Promise<void> {
 
     player.currentAnimation?.update(deltaTime);
     player.currentAnimation?.draw(ctx, player.x, player.y, CELL_SIZE, CELL_SIZE)
-    if (debug) {
-      drawDebugInfoPLayer(ctx, player, color)
+    if (DEBUG) {
+      drawMapDebug(ctx);
+      drawDebugInfoPLayer(ctx, player, hitBoxColor)
     }
     requestAnimationFrame(loop);
   }
@@ -427,9 +425,9 @@ window.addEventListener("keydown", (e) => {
   switch (e.code) {
     case "Space":
       keys.space = true;
-      if (!isJumping) {
-        isJumping = true;
-      }
+      //if (!player.isJumping) {
+      //  player.isJumping = true;
+      //}
       break;
     case "ArrowLeft":
     case "KeyA":
