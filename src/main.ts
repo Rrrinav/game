@@ -5,6 +5,7 @@ import { Vec2 } from "./vec2.js";
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 const DEBUG: boolean = false;
+let isExplosion: boolean = false;
 
 const keys = {
   space: false,
@@ -34,6 +35,7 @@ let spriteAttack: HTMLImageElement;
 let spriteWalk: HTMLImageElement;
 let groundSprite: HTMLImageElement;
 let spriteIdle: HTMLImageElement;
+let explosion: HTMLImageElement;
 
 // INFO: Temporary feature
 function drawDebugInfoPLayer(ctx: CanvasRenderingContext2D, player: Player, rectColor: string = "red", isArrow: boolean = false, arrowColor: string = "white") {
@@ -76,11 +78,25 @@ function drawDebugInfoPLayer(ctx: CanvasRenderingContext2D, player: Player, rect
   }
 }
 
+let explosionAnimation: SpriteAnimation;
+
 async function initialize(): Promise<void> {
   spriteIdle = await loadImage("../assets/Shinobi/Idle.png");
   spriteAttack = await loadImage("../assets/Shinobi/Attack_1.png");
   spriteWalk = await loadImage("../assets/Shinobi/Run.png");
   groundSprite = await loadImage("../assets/Tileset.png");
+  explosion = await loadImage("../assets/Pixel Holy Spell Effect 32x32 Pack 3/00.png")
+
+  const explosionConfig: AnimationConfig = {
+    frameCount: 19,
+    frameWidth: explosion.width / 19,
+    frameHeight: explosion.height / 3,
+    animationCooldown: 0.03,
+    loop: true,
+    autoplay: true,
+    singleUse: true
+  };
+  explosionAnimation = new SpriteAnimation(explosion, explosionConfig);
 }
 
 function initializeMap(): void {
@@ -268,6 +284,8 @@ function checkCollisionSides(x: number, y: number, width: number, height: number
 let lastTime: number = performance.now();
 const GRAVITY: number = 980;
 let hitBoxColor = "blue"
+let mouseX = 0;
+let mouseY = 0;
 
 // Main Game Code
 async function main(): Promise<void> {
@@ -404,6 +422,14 @@ async function main(): Promise<void> {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawMap(ctx);
 
+    if (explosionAnimation?.isAnimFinished()) {
+      isExplosion = false;
+    }
+    if (isExplosion) {
+      explosionAnimation?.draw(ctx, mouseX - (explosion.width / 38) - 20, mouseY - 20 - explosion.height / 6, 100, 100);
+    }
+    explosionAnimation?.update(deltaTime);
+
     player.currentAnimation?.update(deltaTime);
     player.currentAnimation?.draw(ctx, player.x, player.y, CELL_SIZE, CELL_SIZE)
     if (DEBUG) {
@@ -467,3 +493,10 @@ window.addEventListener("keyup", (e) => {
       break;
   }
 });
+
+window.addEventListener("mouseup", (e) => {
+  mouseX = e.clientX
+  mouseY = e.clientY
+  explosionAnimation.reset()
+  isExplosion = true;
+})
