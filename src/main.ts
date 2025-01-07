@@ -4,7 +4,7 @@ import { Vec2 } from "./vec2.js";
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
-const DEBUG: boolean = false;
+const DEBUG: boolean = true;
 let isExplosion: boolean = false;
 
 const keys = {
@@ -118,6 +118,7 @@ function initializeMap(): void {
   }
 
   map[3][11] = 1;
+  map[2][11] = 1;
   map[3][8] = 1;
   map[1][5] = 1;
 
@@ -210,69 +211,93 @@ function checkCollisionSides(x: number, y: number, width: number, height: number
   };
 
   // Calculate the player's bounding box edges
-  const playerLeft: number = x;
-  const playerRight: number = x + width;
-  const playerTop: number = y;
-  const playerBottom: number = y + height;
+  const playerLeft = x;
+  const playerRight = x + width;
+  const playerTop = y;
+  const playerBottom = y + height;
 
-  // Calculate the cells the player is overlapping
-  const leftCell: number = Math.floor(playerLeft / CELL_SIZE);
-  const rightCell: number = Math.floor((playerRight - 1) / CELL_SIZE); // Subtract 1 to avoid detecting next cell
-  const topCell: number = Math.floor(playerTop / CELL_SIZE);
-  const bottomCell: number = Math.floor((playerBottom - 1) / CELL_SIZE); // Subtract 1 to avoid detecting next cell
+  // Calculate the grid cells that could collide with the player
+  const leftCell = Math.floor(playerLeft / CELL_SIZE);
+  const rightCell = Math.floor((playerRight - 1) / CELL_SIZE);
+  const topCell = Math.floor(playerTop / CELL_SIZE);
+  const bottomCell = Math.floor((playerBottom - 1) / CELL_SIZE);
 
-  // Check each potentially colliding cell
+  // Helper function to check if a cell is solid
+  const isSolid = (cy: number, cx: number): boolean => {
+    return cy >= 0 && cy < MAP_HEIGHT && cx >= 0 && cx < MAP_WIDTH && map[cy][cx] === 1;
+  };
+
+  // Check each cell that the player could be colliding with
   for (let cy = topCell; cy <= bottomCell; cy++) {
     for (let cx = leftCell; cx <= rightCell; cx++) {
-      // Skip if out of bounds
-      if (cy < 0 || cy >= MAP_HEIGHT || cx < 0 || cx >= MAP_WIDTH) continue;
+      if (!isSolid(cy, cx)) continue;
 
-      if (map[cy][cx] === 1) {
-        // Calculate cell edges
-        const cellLeft = cx * CELL_SIZE;
-        const cellRight = (cx + 1) * CELL_SIZE;
-        const cellTop = cy * CELL_SIZE;
-        const cellBottom = (cy + 1) * CELL_SIZE;
+      // Find connected solid tiles in the 8 neighboring cells
+      const connected = {
+        left: isSolid(cy, cx - 1),
+        right: isSolid(cy, cx + 1),
+        top: isSolid(cy - 1, cx),
+        bottom: isSolid(cy + 1, cx),
+        topLeft: isSolid(cy - 1, cx - 1),
+        topRight: isSolid(cy - 1, cx + 1),
+        bottomLeft: isSolid(cy + 1, cx - 1),
+        bottomRight: isSolid(cy + 1, cx + 1)
+      };
 
-        // Calculate overlap amounts
-        const overlapLeft = playerRight - cellLeft;
-        const overlapRight = cellRight - playerLeft;
-        const overlapTop = playerBottom - cellTop;
-        const overlapBottom = cellBottom - playerTop;
+      // Calculate region bounds based on connected tiles
+      let region = {
+        left: cx * CELL_SIZE,
+        right: (cx + 1) * CELL_SIZE,
+        top: cy * CELL_SIZE,
+        bottom: (cy + 1) * CELL_SIZE
+      };
+
+      // TODO: Remove checking some unnecessary regions where player will never reach
+      //
+      // Extend region based on connected tiles
+      // We dont need to check left and right of these
+      //if (connected.left) region.left = (cx - 1) * CELL_SIZE;
+      //if (connected.right) region.right = (cx + 2) * CELL_SIZE;
+      if (connected.top) region.top = (cy - 1) * CELL_SIZE;
+      if (connected.bottom) region.bottom = (cy + 2) * CELL_SIZE;
+
+      // Check collision with this region
+      const overlapLeft = playerRight - region.left;
+      const overlapRight = region.right - playerLeft;
+      const overlapTop = playerBottom - region.top;
+      const overlapBottom = region.bottom - playerTop;
+
+      if (overlapLeft > 0 && overlapRight > 0 && overlapTop > 0 && overlapBottom > 0) {
+        result.collided = true;
 
         // Find the smallest overlap
         const overlaps = [
-          { amount: overlapLeft, type: 'left' },
-          { amount: overlapRight, type: 'right' },
-          { amount: overlapTop, type: 'top' },
-          { amount: overlapBottom, type: 'bottom' }
-        ].filter(overlap => overlap.amount > 0);
+          { amount: overlapLeft, type: 'right', snapTo: region.left - width },
+          { amount: overlapRight, type: 'left', snapTo: region.right },
+          { amount: overlapTop, type: 'bottom', snapTo: region.top - height },
+          { amount: overlapBottom, type: 'top', snapTo: region.bottom }
+        ].sort((a, b) => a.amount - b.amount);
 
-        if (overlaps.length > 0) {
-          result.collided = true;
-          const minOverlap = overlaps.reduce((min, current) =>
-            current.amount < min.amount ? current : min
-          );
+        const smallest = overlaps[0];
 
-          // Apply resolution based on smallest overlap
-          switch (minOverlap.type) {
-            case 'left':
-              result.sides.right = true;
-              result.snapPosition.x = cellLeft - width;
-              break;
-            case 'right':
-              result.sides.left = true;
-              result.snapPosition.x = cellRight;
-              break;
-            case 'top':
-              result.sides.bottom = true;
-              result.snapPosition.y = cellTop - height;
-              break;
-            case 'bottom':
-              result.sides.top = true;
-              result.snapPosition.y = cellBottom;
-              break;
-          }
+        // Apply the correction
+        switch (smallest.type) {
+          case 'right':
+            result.sides.right = true;
+            result.snapPosition.x = smallest.snapTo;
+            break;
+          case 'left':
+            result.sides.left = true;
+            result.snapPosition.x = smallest.snapTo;
+            break;
+          case 'top':
+            result.sides.top = true;
+            result.snapPosition.y = smallest.snapTo;
+            break;
+          case 'bottom':
+            result.sides.bottom = true;
+            result.snapPosition.y = smallest.snapTo;
+            break;
         }
       }
     }
@@ -384,7 +409,7 @@ async function main(): Promise<void> {
 
       if (collision.sides.bottom) {
         // Only stop jumping if we're moving downward
-        if (player.dy < 0) {
+        if (player.dy < 0 && player.isJumping) {
           player.isJumping = false;
           player.dy = 550; // Reset jump velocity
         } else {
