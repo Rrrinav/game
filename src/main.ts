@@ -46,7 +46,6 @@ function drawDebugInfoPLayer(ctx: CanvasRenderingContext2D, player: Player, rect
     //ctx.fillStyle = "white";
     //ctx.fillText(`X: ${player.x.toFixed(2)}`, player.x + 5, player.y + 10);
     if (isArrow) {
-
       // Draw direction line
       ctx.beginPath();
       ctx.strokeStyle = arrowColor;
@@ -216,7 +215,7 @@ function checkCollisionSides(x: number, y: number, width: number, height: number
   const playerTop = y;
   const playerBottom = y + height;
 
-  // Calculate the grid cells that could collide with the player
+  // Calculate the surroundings of the player
   const leftCell = Math.floor(playerLeft / CELL_SIZE);
   const rightCell = Math.floor((playerRight - 1) / CELL_SIZE);
   const topCell = Math.floor(playerTop / CELL_SIZE);
@@ -252,14 +251,18 @@ function checkCollisionSides(x: number, y: number, width: number, height: number
         bottom: (cy + 1) * CELL_SIZE
       };
 
-      // TODO: Remove checking some unnecessary regions where player will never reach
-      //
-      // Extend region based on connected tiles
-      // We dont need to check left and right of these
+      // INFO: We only need to check for vertical regions in the left and right cells for now
+      //       We can make it more precise but it is calcuatio overhead!
+
+      // We dont need to check left and right of these since player will never go beyond a single tile before it gets checked
       //if (connected.left) region.left = (cx - 1) * CELL_SIZE;
       //if (connected.right) region.right = (cx + 2) * CELL_SIZE;
-      if (connected.top) region.top = (cy - 1) * CELL_SIZE;
-      if (connected.bottom) region.bottom = (cy + 2) * CELL_SIZE;
+
+      // Extend region based on connected tiles
+      if (cx == leftCell || cx == rightCell) {
+        if (connected.top) region.top = (cy - 1) * CELL_SIZE;
+        if (connected.bottom) region.bottom = (cy + 2) * CELL_SIZE;
+      }
 
       // Check collision with this region
       const overlapLeft = playerRight - region.left;
@@ -388,6 +391,7 @@ async function main(): Promise<void> {
 
     // Check collisions at new position
     const collision = checkCollisionSides(nextX, nextY, CELL_SIZE, CELL_SIZE);
+    //const collision = checkCollisionSides(player.x + 10, player.y, CELL_SIZE - 20, CELL_SIZE);
 
     if (collision.collided)
       hitBoxColor = "red"
@@ -467,6 +471,7 @@ async function main(): Promise<void> {
 }
 
 initialize().then(() => {
+  console.log("Game loaed! ")
   main();
 })
 
