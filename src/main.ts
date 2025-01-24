@@ -16,7 +16,7 @@ const keys = {
 
 let CELL_SIZE: number = 70;
 let MAP_WIDTH: number = 0,
-  MAP_HEIGHT: number = 0;
+    MAP_HEIGHT: number = 0;
 let map: number[][];
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -41,7 +41,9 @@ let explosion: HTMLImageElement;
 function drawDebugInfoPLayer(ctx: CanvasRenderingContext2D, player: Player, rectColor: string = "red", isArrow: boolean = false, arrowColor: string = "white") {
   if (player.isDebug) {
     ctx.strokeStyle = rectColor;
-    ctx.strokeRect(player.x, player.y, CELL_SIZE, CELL_SIZE);
+
+    const { r_x, r_y, r_width, r_height } = player.getHitbox(player.x, player.y, false);
+    ctx.strokeRect(r_x, r_y, r_width, r_height);
     //ctx.font = "10px Arial";
     //ctx.fillStyle = "white";
     //ctx.fillText(`X: ${player.x.toFixed(2)}`, player.x + 5, player.y + 10);
@@ -252,7 +254,7 @@ function checkCollisionSides(x: number, y: number, width: number, height: number
       };
 
       // INFO: We only need to check for vertical regions in the left and right cells for now
-      //       We can make it more precise but it is calcuatio overhead!
+      //       We can make it more precise but it is calcuation overhead!
 
       // We dont need to check left and right of these since player will never go beyond a single tile before it gets checked
       //if (connected.left) region.left = (cx - 1) * CELL_SIZE;
@@ -389,8 +391,10 @@ async function main(): Promise<void> {
       player.dy -= GRAVITY * deltaTime;
     }
 
+    const { r_x, r_y, r_width, r_height } = player.getHitbox(nextX, nextY, player.currentAnimation?.isFlipped() ?? false);
+    const collision = checkCollisionSides(r_x, r_y, r_width, r_height);
     // Check collisions at new position
-    const collision = checkCollisionSides(nextX, nextY, CELL_SIZE, CELL_SIZE);
+    //const collision = checkCollisionSides(nextX, nextY, CELL_SIZE, CELL_SIZE);
     //const collision = checkCollisionSides(player.x + 10, player.y, CELL_SIZE - 20, CELL_SIZE);
 
     if (collision.collided)
@@ -398,37 +402,54 @@ async function main(): Promise<void> {
     else
       hitBoxColor = "blue"
 
-    // Apply horizontal movement if no collision
     if (!collision.sides.left && !collision.sides.right) {
+      // No horizontal collision, move player normally
       player.x = nextX;
     } else {
-      player.x = collision.snapPosition.x;
+      // Adjust player position based on hitbox offset and collision side
+      if (collision.sides.left) {
+        player.x = collision.snapPosition.x - player.hbOffset_X;
+      } else if (collision.sides.right) {
+        player.x = collision.snapPosition.x - (player.hbOffset_X );
+      }
     }
 
-    // Apply vertical movement and handle collisions with preserved momentum
     if (!collision.sides.top && !collision.sides.bottom) {
+      // No vertical collision, move player normally
       player.y = nextY;
     } else {
-      player.y = collision.snapPosition.y;
+      // Adjust player position based on hitbox offset and collision side
+      if (collision.sides.top) {
+        player.y = collision.snapPosition.y - player.hbOffset_Y;
+      } else if (collision.sides.bottom) {
+        player.y = collision.snapPosition.y - (player.hbOffset_Y );
+      }
 
+      // Handle jumping and gravity
       if (collision.sides.bottom) {
-        // Only stop jumping if we're moving downward
         if (player.dy < 0 && player.isJumping) {
+          // Stop jumping if moving downward
           player.isJumping = false;
           player.dy = 550; // Reset jump velocity
         } else {
-          // We hit something while moving upward - preserve remaining upward velocity
-          player.y = collision.snapPosition.y;
+          // Preserve upward velocity if hitting something while moving upward
+          player.y = collision.snapPosition.y - (player.hbOffset_Y + player.hitboxHeight);
         }
       } else if (collision.sides.top) {
-        // Hit ceiling - reverse velocity
-        player.dy = -player.dy * 0.3; // Add some bounce/rebound effect (optional)
+        // Hit ceiling - reverse velocity with some bounce effect
+        player.dy = -player.dy * 0.3;
       }
     }
 
     // Check if we should fall
     if (!player.isJumping) {
-      const groundCheck = checkCollisionSides(player.x, player.y + 1, CELL_SIZE, CELL_SIZE);
+      // Calculate the hitbox position for the ground check
+      const { r_x, r_y, r_width, r_height } = player.getHitbox(player.x, player.y + 1, player.currentAnimation?.isFlipped() ?? false);
+
+      // Perform the ground check using the hitbox position
+      const groundCheck = checkCollisionSides(r_x, r_y, r_width, r_height);
+
+      // If there's no ground below the player, start falling
       if (!groundCheck.sides.bottom) {
         player.isJumping = true;
         player.dy = 0; // Start falling from rest
@@ -451,9 +472,6 @@ async function main(): Promise<void> {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawMap(ctx);
 
-    if (explosionAnimation?.isAnimFinished()) {
-      isExplosion = false;
-    }
     if (isExplosion) {
       explosionAnimation?.draw(ctx, mouseX - (explosion.width / 38) - 20, mouseY - 20 - explosion.height / 6, 100, 100);
     }
@@ -462,6 +480,19 @@ async function main(): Promise<void> {
     player.currentAnimation?.update(deltaTime);
     player.currentAnimation?.draw(ctx, player.x, player.y, CELL_SIZE, CELL_SIZE)
     if (DEBUG) {
+      ctx.font = "30px Arial";
+      ctx.fillStyle = "Red";
+      if (collision.sides.right)
+        ctx.fillText("Right",  0,  50);
+      if (collision.sides.left)
+        ctx.fillText("Left",  40,  50);
+      if (collision.sides.top)
+        ctx.fillText("Top", 80,  50);
+      if (collision.sides.bottom)
+        ctx.fillText("Bottom",  120,  50);
+      if (explosionAnimation?.isAnimFinished()) {
+        isExplosion = false;
+      }
       drawMapDebug(ctx);
       drawDebugInfoPLayer(ctx, player, hitBoxColor)
     }

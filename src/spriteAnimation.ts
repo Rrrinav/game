@@ -173,4 +173,8 @@ export class SpriteAnimation {
       this.frames = this.generateFrames();
     }
   }
+
+  isFlipped(vertically: boolean = false): boolean {
+    return vertically ? this.flipV : this.flipH;
+  }
 }
